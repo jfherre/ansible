@@ -1,0 +1,10 @@
+---
+- name: Parchar un conjunto de Servidores de Linux
+  hosts: all
+  become: true
+  tasks:
+    - name: Update all packages Red Hat 8, 9 or oracle Linux 8, 9
+      ansible.builtin.dnf:
+        name: "*"
+        state: latest
+      register: update_result
