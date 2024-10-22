@@ -1,6 +1,6 @@
 ---
 - name: Parchar un conjunto de Servidores de Linux
-  hosts: all
+  hosts: web
   become: true
   tasks:
     - name: Update all packages Red Hat 8, 9 or oracle Linux 8, 9
