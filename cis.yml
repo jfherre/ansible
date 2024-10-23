@@ -52,17 +52,22 @@
             path: /etc/aide.conf
             line: '{{ item }} p+i+n+u+g+s+b+acl+xattrs+sha512'
           with_items: '{{ audit_tools }}'
-          
+
         - name: Set cron package name - RedHat
           set_fact:
             cron_pkg_name: cronie
+          when: ansible_os_family == "RedHat"
+
         - name: Set cron package name - Debian
           set_fact:
             cron_pkg_name: cron
+          when: ansible_os_family == "Debian"
+
         - name: Install cron
           ansible.builtin.package:
             name: '{{ cron_pkg_name }}'
             state: present
+            
         - name: Configure Periodic Execution of AIDE
           ansible.builtin.cron:
             name: run AIDE check
