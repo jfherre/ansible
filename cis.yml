@@ -52,6 +52,7 @@
             path: /etc/aide.conf
             line: '{{ item }} p+i+n+u+g+s+b+acl+xattrs+sha512'
           with_items: '{{ audit_tools }}'
+          
         - name: Set cron package name - RedHat
           set_fact:
             cron_pkg_name: cronie
