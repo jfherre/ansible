@@ -6,6 +6,13 @@
     - cis
   vars:
       var_system_crypto_policy: "DEFAULT"
+      var_accounts_maximum_age_login_defs: '365'
+      var_account_disable_post_pw_expiration: '30'
+      var_accounts_minimum_age_login_defs: '1'
+      var_accounts_password_warn_age_login_defs: '7'
+      var_accounts_user_umask: '027'
+      var_password_pam_minclass: '4'
+      var_password_pam_minlen: '14'
   tasks:
     - block:
         - name: Build and Test AIDE Database - Ensure AIDE Is Installed
@@ -67,7 +74,7 @@
           ansible.builtin.package:
             name: '{{ cron_pkg_name }}'
             state: present
-            
+
         - name: Configure Periodic Execution of AIDE
           ansible.builtin.cron:
             name: run AIDE check
@@ -100,3 +107,71 @@
             regexp: (?i)^\s*CRYPTO_POLICY.*$
       tags:
         - ssh
+
+    - block:
+        - name: Set Account Expiration Following Inactivity
+          ansible.builtin.lineinfile:
+            create: true
+            dest: /etc/default/useradd
+            regexp: ^INACTIVE
+            line: INACTIVE={{ var_account_disable_post_pw_expiration }}
+
+        - name: Set Password Maximum Age
+          ansible.builtin.lineinfile:
+            create: true
+            dest: /etc/login.defs
+            regexp: ^#?PASS_MAX_DAYS
+            line: PASS_MAX_DAYS {{ var_accounts_maximum_age_login_defs }}
+
+        - name: Set Password Maximum Age
+          ansible.builtin.lineinfile:
+            create: true
+            dest: /etc/login.defs
+            regexp: ^#?PASS_MAX_DAYS
+            line: PASS_MAX_DAYS {{ var_accounts_maximum_age_login_defs }}
+
+        - name: Set Password Minimum Age
+          ansible.builtin.lineinfile:
+            create: true
+            dest: /etc/login.defs
+            regexp: ^#?PASS_MIN_DAYS
+            line: PASS_MIN_DAYS {{ var_accounts_minimum_age_login_defs }}
+
+        - name: Set Existing Passwords Warning Age - Collect Users With Incorrect Number of Days of Warning Before Password Expires
+          ansible.builtin.command:
+            cmd: awk -F':' '(($6 < {{ var_accounts_password_warn_age_login_defs }} || $6 == "") && $2 ~ /^\$/) {print $1}' /etc/shadow
+          register: result_pass_warn_age_user_names
+          changed_when: false
+
+        - name: Set Existing Passwords Warning Age - Ensure the Number of Days of Warning Before Password Expires
+          ansible.builtin.command:
+            cmd: chage --warndays {{ var_accounts_password_warn_age_login_defs }} {{ item }}
+          with_items: '{{ result_pass_warn_age_user_names.stdout_lines }}'
+
+        - name: Set Password Warning Age
+          lineinfile:
+            dest: /etc/login.defs
+            regexp: ^PASS_WARN_AGE *[0-9]*
+            state: present
+            line: PASS_WARN_AGE        {{ var_accounts_password_warn_age_login_defs }}
+            create: true
+
+        - name: Replace user umask in /etc/bashrc
+          ansible.builtin.replace:
+            path: /etc/bashrc
+            regexp: ^(\s*)umask(\s+).*
+            replace: \g<1>umask\g<2>{{ var_accounts_user_umask }}
+
+        - name: Ensure PAM Enforces Password Requirements - Minimum Different Categories - Ensure PAM variable minclass is set accordingly
+          ansible.builtin.lineinfile:
+            create: true
+            dest: /etc/security/pwquality.conf
+            regexp: ^#?\s*minclass
+            line: minclass = {{ var_password_pam_minclass }}
+
+        - name: Ensure PAM Enforces Password Requirements - Minimum Length - Ensure PAM variable minlen is set accordingly
+          ansible.builtin.lineinfile:
+            create: true
+            dest: /etc/security/pwquality.conf
+            regexp: ^#?\s*minlen
+            line: minlen = {{ var_password_pam_minlen }}
